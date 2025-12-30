@@ -118,9 +118,21 @@ app.post("/push",(req,res)=>{
   res.json({ok:true});
 });
 
-// ================= SEND TO HTML =================
-app.get("/", (req, res) => {
-  res.send("Wingo backend running ✅");
+// ================== STATE API (FOR HTML) ==================
+app.get("/state", (req, res) => {
+  const total = memory.accuracy.win + memory.accuracy.loss;
+  const acc = total
+    ? Math.round((memory.accuracy.win / total) * 100)
+    : 0;
+
+  res.json({
+    history: memory.history.slice(-30),
+    signal: memory.signal || "-",
+    prediction: memory.prediction || "WAIT",
+    strength: memory.strength || 0,
+    accuracy: acc,
+    breakerSplit: memory.breakerSplit || { Big: 0, Small: 0 }
+  });
 });
 
 // ================= START =================
