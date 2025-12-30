@@ -5,58 +5,68 @@
 <title>Wingo System</title>
 <style>
 body{background:#000;color:#fff;font-family:Arial}
-.box{border:1px solid #333;padding:10px;margin:10px}
-table{width:100%;border-collapse:collapse}
+table{width:100%;border-collapse:collapse;margin-top:10px}
 th,td{border:1px solid #333;padding:6px;text-align:center}
-.big{color:#4da3ff}
-.small{color:#ffa500}
+.big{color:#4da6ff}
+.small{color:#ff9933}
+.break{color:red}
+.stable{color:#00ff99}
 </style>
 </head>
 <body>
 
 <h2>📊 Wingo System</h2>
 
-<div class="box">
-Signal: <b id="signal">-</b><br>
-Prediction: <b id="prediction">WAIT</b><br>
-Strength: <b id="strength">0%</b>
-</div>
-
-<div class="box">
-🎯 Accuracy: <b id="accuracy">0%</b>
+<div id="info">
+Signal: <span id="signal">-</span><br>
+Strength: <span id="strength">0%</span><br>
+Prediction: <span id="prediction">WAIT</span><br><br>
+🎯 Accuracy: <span id="accuracy">0%</span><br>
+🟦 Big Breaks: <span id="bb">0</span> |
+🟧 Small Breaks: <span id="sb">0</span>
 </div>
 
 <table>
 <thead>
-<tr><th>Period</th><th>Number</th><th>BS</th></tr>
+<tr>
+<th>Period</th>
+<th>Number</th>
+<th>BS</th>
+</tr>
 </thead>
 <tbody id="rows"></tbody>
 </table>
 
 <script>
-const API = "https://YOUR-RENDER-URL.onrender.com/state"; // 🔴 change this
+const BACKEND =
+"https://wingo-system.onrender.com/state";
 
 async function load(){
-  try{
-    const r = await fetch(API);
-    const d = await r.json();
+  const r = await fetch(BACKEND);
+  const d = await r.json();
 
-    document.getElementById("signal").innerText = d.signal;
-    document.getElementById("prediction").innerText = d.prediction;
-    document.getElementById("strength").innerText = d.strength+"%";
-    document.getElementById("accuracy").innerText = d.accuracy+"%";
+  document.getElementById("signal").innerText = d.signal;
+  document.getElementById("signal").className =
+    d.signal==="BREAK"?"break":"stable";
 
-    const tb = document.getElementById("rows");
-    tb.innerHTML="";
-    d.history.forEach(x=>{
-      tb.innerHTML += `
-      <tr>
-        <td>${x.period}</td>
-        <td>${x.number}</td>
-        <td class="${x.bs==="Big"?"big":"small"}">${x.bs}</td>
-      </tr>`;
-    });
-  }catch(e){}
+  document.getElementById("strength").innerText = d.strength+"%";
+  document.getElementById("prediction").innerText = d.prediction;
+  document.getElementById("accuracy").innerText = d.accuracy+"%";
+
+  document.getElementById("bb").innerText = d.breakerSplit.Big;
+  document.getElementById("sb").innerText = d.breakerSplit.Small;
+
+  const tb = document.getElementById("rows");
+  tb.innerHTML = "";
+  d.history.slice().reverse().forEach(x=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${x.period}</td>
+      <td>${x.number}</td>
+      <td class="${x.bs==="Big"?"big":"small"}">${x.bs}</td>
+    `;
+    tb.appendChild(tr);
+  });
 }
 
 setInterval(load,3000);
