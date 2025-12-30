@@ -2,149 +2,117 @@ import express from "express";
 import axios from "axios";
 
 const app = express();
-app.use(express.json());
-
 const PORT = process.env.PORT || 3000;
 
-// 🔐 Telegram ENV
-const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
-const TG_CHAT_ID = process.env.TG_CHAT_ID;
+app.use(express.json());
 
-// ================= MEMORY =================
+// ===== TELEGRAM CONFIG =====
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
+const TG_CHAT_ID  = process.env.TG_CHAT_ID;
+
+// ===== MEMORY =====
 let memory = {
   lastPeriod: "",
-  history: [],        // {period, number, bs}
-  accuracy: { win:0, loss:0 },
-  breakerSplit: { Big:0, Small:0 }
+  history: [],
+  accuracy: { win: 0, loss: 0 },
+  breakerSplit: { Big: 0, Small: 0 },
+  signal: "-",
+  prediction: "WAIT",
+  strength: 0
 };
 
-// ================= TELEGRAM =================
-async function sendTG(msg){
+// ===== HELPERS =====
+const bigSmall = n => (n >= 5 ? "Big" : "Small");
+
+async function sendTG(msg) {
+  if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
   await axios.post(
     `https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`,
     { chat_id: TG_CHAT_ID, text: msg }
   );
 }
 
-// ================= RESTORE =================
-async function restoreFromTelegram(){
-  try{
-async function fetchWingo() {
+// ===== RESTORE FROM TELEGRAM =====
+async function restoreFromTelegram() {
   try {
-    const r = await axios.get(API);
-    const item = r.data?.data?.list?.[0];
-    if (!item) return;
+    const res = await axios.get(
+      `https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates`
+    );
 
-    const period = item.issueNumber;
-    const number = Number(item.number);
+    res.data.result.forEach(u => {
+      const t = u.message?.text || "";
+      const m = t.match(/^(\d+)\|(\d+)\|(Big|Small)$/);
+      if (!m) return;
 
-    if (memory.lastPeriod === period) return;
+      if (memory.history.find(x => x.period === m[1])) return;
 
-    const bs = number >= 5 ? "Big" : "Small";
+      memory.history.push({
+        period: m[1],
+        number: +m[2],
+        bs: m[3]
+      });
 
-    const a = analyze();
-    if (a.prediction !== "WAIT") {
-      if (a.prediction === bs) memory.accuracy.win++;
-      else memory.accuracy.loss++;
-    }
+      memory.lastPeriod = m[1];
+    });
 
-    memory.lastPeriod = period;
-    memory.history.push({ period, number, bs });
-
-    if (!memory.prevBS) memory.prevBS = bs;
-    if (memory.prevBS !== bs) {
-      memory.breakerSplit[bs]++;
-      memory.prevBS = bs;
-    }
-
-    sendTG(`${period}|${number}|${bs}`);
-    console.log("Auto fetch:", period, number, bs);
-  } catch (e) {
-    console.log("Fetch error");
+    console.log("Telegram restore done");
+  } catch {
+    console.log("Telegram restore failed");
   }
 }
 
-// ================= ANALYSIS =================
-function analyze(){
+// ===== ANALYSIS =====
+function analyze() {
   const h = memory.history;
-  if(h.length < 2){
-    return { signal:"WAIT", prediction:"WAIT", strength:0 };
+  if (h.length < 6) {
+    memory.signal = "-";
+    memory.prediction = "WAIT";
+    memory.strength = 0;
+    return;
   }
 
-  // streak count
-  let count=1;
-  for(let i=h.length-1;i>0;i--){
-    if(h[i].bs===h[i-1].bs) count++;
-    else break;
-  }
+  const last = h.slice(-5).map(x => x.bs);
+  const same = last.every(v => v === last[0]);
 
-  const last = h[h.length-1].bs;
-
-  // strength score (advanced)
-  const strength = Math.min(100, count * 20);
-
-  if(count >= 4){
-    return { signal:"BREAKER", prediction:"WAIT", strength };
+  if (same) {
+    memory.signal = "STABLE";
+    memory.prediction = last[0];
+    memory.strength = 80;
+  } else {
+    memory.signal = "BREAK";
+    memory.prediction = last[4] === "Big" ? "Small" : "Big";
+    memory.strength = 65;
   }
-  if(count === 3){
-    // breaker split
-    memory.breakerSplit[last]++;
-    return {
-      signal:"BREAK",
-      prediction: last==="Big"?"Small":"Big",
-      strength
-    };
-  }
-  return {
-    signal:"STABLE",
-    prediction:last,
-    strength
-  };
 }
 
-// ================= RECEIVE FROM HTML =================
-app.post("/push",(req,res)=>{
-  const { period, number } = req.body;
-  if(!period && number===undefined) return res.json({ok:false});
+// ===== AUTO FETCH FROM TELEGRAM (REAL SOURCE) =====
+async function autoFetch() {
+  await restoreFromTelegram();
+  analyze();
+}
+setInterval(autoFetch, 5000);
 
-  if(memory.lastPeriod === period){
-    return res.json({ok:false,dup:true});
-  }
-
-  const bs = number>=5?"Big":"Small";
-  memory.lastPeriod = period;
-
-  // accuracy check (previous prediction)
-  const a = analyze();
-  if(a.prediction!=="WAIT"){
-    if(a.prediction === bs) memory.accuracy.win++;
-    else memory.accuracy.loss++;
-  }
-
-  memory.history.push({period, number, bs});
-
-  sendTG(`${period}|${number}|${bs}`);
-  res.json({ok:true});
-});
-
-// ================== STATE API (FOR HTML) ==================
+// ===== API FOR HTML =====
 app.get("/state", (req, res) => {
   const total = memory.accuracy.win + memory.accuracy.loss;
-  const acc = total
-    ? Math.round((memory.accuracy.win / total) * 100)
-    : 0;
+  const acc = total ? Math.round((memory.accuracy.win / total) * 100) : 0;
 
   res.json({
     history: memory.history.slice(-30),
-    signal: memory.signal || "-",
-    prediction: memory.prediction || "WAIT",
-    strength: memory.strength || 0,
+    signal: memory.signal,
+    prediction: memory.prediction,
+    strength: memory.strength,
     accuracy: acc,
-    breakerSplit: memory.breakerSplit || { Big: 0, Small: 0 }
+    breakerSplit: memory.breakerSplit
   });
 });
 
-// ================= START =================
+// ===== HEALTH CHECK =====
+app.get("/", (req, res) => {
+  res.send("Wingo backend running ✅");
+});
+
+// ===== START =====
 app.listen(PORT, async () => {
   console.log("Server running on", PORT);
   await restoreFromTelegram();
