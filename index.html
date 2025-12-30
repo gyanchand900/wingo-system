@@ -85,46 +85,36 @@ thead{
 </div>
 
 <script>
-/* 🔴 CHANGE THIS */
-const BACKEND_URL = "https://wingo-system.onrender.com";
+<script>
+const API = "https://wings-system.onrender.com/state"; 
+// ↑ yaha apna Render URL lagana
 
-function renderTable(list){
-  const tb = document.getElementById("table");
-  tb.innerHTML = "";
-  list.forEach(r=>{
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.period}</td>
-      <td>${r.number}</td>
-      <td class="${r.bs === "Big" ? "big" : "small"}">${r.bs}</td>
-    `;
-    tb.appendChild(tr);
-  });
+async function load() {
+  try {
+    const r = await fetch(API);
+    const d = await r.json();
+
+    document.getElementById("signal").innerText = d.signal;
+    document.getElementById("prediction").innerText = d.prediction;
+    document.getElementById("strength").innerText = d.strength + "%";
+    document.getElementById("accuracy").innerText = d.accuracy + "%";
+
+    const tbody = document.getElementById("rows");
+    tbody.innerHTML = "";
+
+    d.history.forEach(x => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${x.period}</td>
+          <td>${x.number}</td>
+          <td>${x.bs}</td>
+        </tr>`;
+    });
+  } catch(e){}
 }
 
-async function load(){
-  try{
-    const res = await fetch(BACKEND_URL + "/state");
-    const d = await res.json();
-
-    document.getElementById("signal").innerText = d.signal || "-";
-    document.getElementById("prediction").innerText = d.prediction || "WAIT";
-    document.getElementById("strength").innerText = (d.strength || 0) + "%";
-    document.getElementById("accuracy").innerText = (d.accuracy || 0) + "%";
-
-    document.getElementById("bigBreak").innerText =
-      d.breakerSplit?.Big || 0;
-    document.getElementById("smallBreak").innerText =
-      d.breakerSplit?.Small || 0;
-
-    renderTable(d.history || []);
-  }catch(e){
-    console.log("backend not ready");
-  }
-}
-
+setInterval(load, 3000);
 load();
-setInterval(load,3000);
 </script>
 
 </body>
