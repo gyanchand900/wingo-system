@@ -29,29 +29,38 @@ async function sendTG(msg){
 // ================= RESTORE =================
 async function restoreFromTelegram(){
   try{
-    const res = await axios.get(
-      `https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates`
-    );
-    const updates = res.data.result || [];
+async function fetchWingo() {
+  try {
+    const r = await axios.get(API);
+    const item = r.data?.data?.list?.[0];
+    if (!item) return;
 
-    updates.forEach(u=>{
-      const t = u.message?.text || "";
-      const m = t.match(/^(\d+)\|(\d+)\|(Big|Small)$/);
-      if(!m) return;
+    const period = item.issueNumber;
+    const number = Number(item.number);
 
-      if(memory.history.find(x=>x.period===m[1])) return;
+    if (memory.lastPeriod === period) return;
 
-      memory.history.push({
-        period:m[1],
-        number:+m[2],
-        bs:m[3]
-      });
-      memory.lastPeriod = m[1];
-    });
+    const bs = number >= 5 ? "Big" : "Small";
 
-    console.log("Telegram restored:", memory.history.length);
-  }catch(e){
-    console.log("Restore failed");
+    const a = analyze();
+    if (a.prediction !== "WAIT") {
+      if (a.prediction === bs) memory.accuracy.win++;
+      else memory.accuracy.loss++;
+    }
+
+    memory.lastPeriod = period;
+    memory.history.push({ period, number, bs });
+
+    if (!memory.prevBS) memory.prevBS = bs;
+    if (memory.prevBS !== bs) {
+      memory.breakerSplit[bs]++;
+      memory.prevBS = bs;
+    }
+
+    sendTG(`${period}|${number}|${bs}`);
+    console.log("Auto fetch:", period, number, bs);
+  } catch (e) {
+    console.log("Fetch error");
   }
 }
 
@@ -136,7 +145,9 @@ app.get("/state", (req, res) => {
 });
 
 // ================= START =================
-app.listen(PORT, async ()=>{
+setInterval(fetchWingo, 5000);
+
+app.listen(PORT, async () => {
   console.log("Server running on", PORT);
   await restoreFromTelegram();
 });
