@@ -145,8 +145,6 @@ app.get("/state", (req, res) => {
 });
 
 // ================= START =================
-setInterval(fetchWingo, 5000);
-
 app.listen(PORT, async () => {
   console.log("Server running on", PORT);
   await restoreFromTelegram();
