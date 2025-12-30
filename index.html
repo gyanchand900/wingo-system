@@ -1,91 +1,130 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Wingo Final System</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8" />
+<title>Wingo System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
 <style>
-body{background:#000;color:#fff;font-family:Arial}
-.box{border:1px solid #333;padding:8px;margin:6px;text-align:center}
-table{width:100%;border-collapse:collapse}
-th,td{border:1px solid #333;padding:6px;text-align:center}
-.big{color:#00ff7f}
-.small{color:#ff4d4d}
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#000;
+  color:#fff;
+}
+h1{
+  text-align:center;
+  padding:10px;
+}
+.card{
+  border:1px solid #333;
+  margin:10px;
+  padding:10px;
+  border-radius:6px;
+}
+.row{
+  display:flex;
+  justify-content:space-between;
+  margin:5px 0;
+}
+.big{color:#4da3ff}
+.small{color:#ff9800}
 .stable{color:#00ff7f}
-.break{color:#ff4d4d}
-.breaker{color:#ff9800}
+.break{color:#ff3b3b}
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+th,td{
+  border:1px solid #333;
+  padding:6px;
+  text-align:center;
+}
+thead{
+  background:#111;
+}
 </style>
 </head>
+
 <body>
 
-<h3>📊 Wingo System</h3>
+<h1>📊 Wingo System</h1>
 
-<div class="box">
-Signal: <span id="signal">-</span><br>
-Strength: <span id="strength">0</span>%<br>
-🔮 Prediction: <span id="pred">WAIT</span>
+<div class="card">
+  <div class="row"><span>Signal</span><span id="signal">-</span></div>
+  <div class="row"><span>Strength</span><span id="strength">0%</span></div>
+  <div class="row"><span>🔮 Prediction</span><span id="prediction">WAIT</span></div>
 </div>
 
-<div class="box">
-🎯 Accuracy: <span id="acc">0</span>%<br>
-🟦 Big Breaks: <span id="bb">0</span> |
-🟧 Small Breaks: <span id="sb">0</span>
+<div class="card">
+  <div class="row">
+    <span>🎯 Accuracy</span>
+    <span id="accuracy">0%</span>
+  </div>
+  <div class="row">
+    <span class="big">🟦 Big Breaks</span>
+    <span id="bigBreak">0</span>
+  </div>
+  <div class="row">
+    <span class="small">🟧 Small Breaks</span>
+    <span id="smallBreak">0</span>
+  </div>
 </div>
 
-<table>
-<thead>
-<tr><th>Period</th><th>Number</th><th>BS</th></tr>
-</thead>
-<tbody id="rows"></tbody>
-</table>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>Number</th>
+        <th>BS</th>
+      </tr>
+    </thead>
+    <tbody id="table"></tbody>
+  </table>
+</div>
 
 <script>
+/* 🔴 CHANGE THIS */
 const BACKEND_URL = "https://wingo-system.onrender.com";
 
-async function loadState(){
-  const r = await fetch(BACKEND_URL+"/state");
-  const d = await r.json();
-
-  document.getElementById("signal").innerText = d.signal;
-  document.getElementById("signal").className = d.signal.toLowerCase();
-  document.getElementById("pred").innerText = d.prediction;
-  document.getElementById("strength").innerText = d.strength;
-  document.getElementById("acc").innerText = d.accuracy;
-  document.getElementById("bb").innerText = d.breakerSplit.Big;
-  document.getElementById("sb").innerText = d.breakerSplit.Small;
-
-  const tb=document.getElementById("rows");
-  tb.innerHTML="";
-  d.history.slice().reverse().forEach(x=>{
-    const tr=document.createElement("tr");
-    tr.innerHTML=`
-      <td>${x.period}</td>
-      <td>${x.number}</td>
-      <td class="${x.bs==="Big"?"big":"small"}">${x.bs}</td>
+function renderTable(list){
+  const tb = document.getElementById("table");
+  tb.innerHTML = "";
+  list.forEach(r=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.period}</td>
+      <td>${r.number}</td>
+      <td class="${r.bs === "Big" ? "big" : "small"}">${r.bs}</td>
     `;
     tb.appendChild(tr);
   });
 }
 
-async function fetchAPI(){
-  const r = await fetch("https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json");
-  const j = await r.json();
-  const item=j.data.list[0];
+async function load(){
+  try{
+    const res = await fetch(BACKEND_URL + "/state");
+    const d = await res.json();
 
-  await fetch(BACKEND_URL+"/push",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({
-      period:item.issueNumber,
-      number:item.number
-    })
-  });
+    document.getElementById("signal").innerText = d.signal || "-";
+    document.getElementById("prediction").innerText = d.prediction || "WAIT";
+    document.getElementById("strength").innerText = (d.strength || 0) + "%";
+    document.getElementById("accuracy").innerText = (d.accuracy || 0) + "%";
 
-  loadState();
+    document.getElementById("bigBreak").innerText =
+      d.breakerSplit?.Big || 0;
+    document.getElementById("smallBreak").innerText =
+      d.breakerSplit?.Small || 0;
+
+    renderTable(d.history || []);
+  }catch(e){
+    console.log("backend not ready");
+  }
 }
 
-loadState();
-setInterval(fetchAPI,3000);
+load();
+setInterval(load,3000);
 </script>
 
 </body>
