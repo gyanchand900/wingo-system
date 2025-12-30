@@ -119,19 +119,8 @@ app.post("/push",(req,res)=>{
 });
 
 // ================= SEND TO HTML =================
-app.get("/state",(req,res)=>{
-  const a = analyze();
-  const total = memory.accuracy.win + memory.accuracy.loss;
-  const acc = total ? Math.round((memory.accuracy.win/total)*100) : 0;
-
-  res.json({
-    history: memory.history.slice(-20),
-    signal: a.signal,
-    prediction: a.prediction,
-    strength: a.strength,
-    accuracy: acc,
-    breakerSplit: memory.breakerSplit
-  });
+app.get("/", (req, res) => {
+  res.send("Wingo backend running ✅");
 });
 
 // ================= START =================
