@@ -8,8 +8,8 @@ const PORT = process.env.PORT || 3000;
 const API =
   "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json";
 
-const TG_BOT_TOKEN = process.env.8297180938:AAHmCdIYnuf2vfidz3wfJXHAOZ9rE5J-lhk;
-const TG_CHAT_ID   = process.env.8455379007;
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
+const TG_CHAT_ID   = process.env.TG_CHAT_ID;
 
 /* ================= MEMORY ================= */
 let memory = {
